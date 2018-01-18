@@ -40,4 +40,4 @@ union psrValues {
 #define MAXPRIORITY 1
 #define SENTINELPID 1
 #define SENTINELPRIORITY (MINPRIORITY + 1)
-
+#define UNUSED -1

@@ -8,7 +8,7 @@
 #include <usloss.h>
 
 /*
- * Maximum number of processes. 
+ * Maximum number of processes.
  */
 
 #define MAXPROC      50
@@ -32,7 +32,7 @@
 #define MAXSYSCALLS  50
 
 
-/* 
+/*
  * Function prototypes for this phase.
  */
 
