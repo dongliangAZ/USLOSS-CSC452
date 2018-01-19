@@ -73,7 +73,7 @@ void startup(int argc, char *argv[])
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
     }
-    int result = fork1; /* value returned by call to fork1() */
+    int result; /* value returned by call to fork1() */
 
     /* initialize the process table */
     if (DEBUG && debugflag)
@@ -156,10 +156,28 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
         USLOSS_Console("fork1(): creating process %s\n", name);
 
     // test if in kernel mode; halt if in user mode
+    if(currentMode() == 0){
+        printf("You are not in kernal mode");
+        USLOSS_Halt(1)
+    }
 
     // Return if stack size is too small
+    if(stacksize < USLOSS_MIN_STACK){
+        return -2;
+    }
 
     // Is there room in the process table? What is the next PID?
+    int ProcSpace = 0;
+    for(int i = 0; i < MAXPROC; i++){
+        if(ProcTable[(nextPid + i)% MAXPROC] == -1){
+            ProcSpace = 1;
+            break;
+        }
+    }
+    if(ProcSpace == 0){
+        return -1;
+    }
+    
 
     // fill-in entry in process table */
     if ( strlen(name) >= (MAXNAME - 1) ) {
