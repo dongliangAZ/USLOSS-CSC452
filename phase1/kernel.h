@@ -1,4 +1,4 @@
-/* Patrick's DEBUG printing constant... */
+/* Patrick's DEBUG printing constant... test */
 #define DEBUG 0
 
 typedef struct procStruct procStruct;

@@ -42,6 +42,21 @@ unsigned int nextPid = SENTINELPID;
 
 /* -------------------------- Functions ----------------------------------- */
 /* ------------------------------------------------------------------------
+   Name - currentMode
+   Purpose - returns which mode you are in.
+   Parameters - 
+   Returns - 1 is kernal, 0 is user, and -1 is error
+   Side Effects - 
+   ----------------------------------------------------------------------- */
+
+int currentMode()
+{
+    union psrValues psr;
+    psr.integerPart = USLOSS_PsrGet()
+    return psr.bits.curMode
+}
+
+/* ------------------------------------------------------------------------
    Name - startup
    Purpose - Initializes process lists and clock interrupt vector.
              Start up sentinel process and the test process.
@@ -50,9 +65,15 @@ unsigned int nextPid = SENTINELPID;
    Side Effects - lots, starts the whole thing
    Jan 17 (Not yet done)
    ----------------------------------------------------------------------- */
+
+   
 void startup(int argc, char *argv[])
-{
-    int result; /* value returned by call to fork1() */
+{   
+    if(currentMode() == 0){
+        printf("You are not in kernal mode");
+        USLOSS_Halt(1)
+    }
+    int result = fork1; /* value returned by call to fork1() */
 
     /* initialize the process table */
     if (DEBUG && debugflag)
