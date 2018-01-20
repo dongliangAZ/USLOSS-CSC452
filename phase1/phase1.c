@@ -71,7 +71,7 @@ int currentMode()
  */
 
 int CPUtime() {
-  if(USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &status) == USLOSS_DEV_OK)
+  if(USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, -1) == USLOSS_DEV_OK)
       return -1;
   else
       return USLOSS_DEV_INVALID;
