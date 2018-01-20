@@ -26,7 +26,7 @@ static void checkDeadlock();
 
 // Patrick's debugging global variable...
 int debugflag = 1;
-
+int mydebugflag = 0;
 // the process table
 procStruct ProcTable[MAXPROC];
 
@@ -44,9 +44,9 @@ unsigned int nextPid = SENTINELPID;
 /* ------------------------------------------------------------------------
    Name - currentMode
    Purpose - returns which mode you are in.
-   Parameters - 
+   Parameters -
    Returns - 1 is kernal, 0 is user, and -1 is error
-   Side Effects - 
+   Side Effects -
    ----------------------------------------------------------------------- */
 
 int currentMode()
@@ -66,9 +66,33 @@ int currentMode()
    Jan 17 (Not yet done)
    ----------------------------------------------------------------------- */
 
-   
+/*
+ * CPUtime---return the time of CPU used by the current process
+ */
+
+int CPUtime() {
+  if(USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &status) == USLOSS_DEV_OK)
+      return -1;
+  else
+      return USLOSS_DEV_INVALID;
+}
+
+void interruptCase(int DEV, void* args){
+
+}
+
+
+void Interrupts(){
+
+}
+
+void noInterrupts(){
+
+}
+
+
 void startup(int argc, char *argv[])
-{   
+{
     if(currentMode() == 0){
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
@@ -88,7 +112,8 @@ void startup(int argc, char *argv[])
     ReadyList = NULL;
 
     // Initialize the clock interrupt handler
-    //Need to figure out.
+    USLOSS_IntVec[USLOSS_ILLEGAL_INT] = interruptCase;
+    USLOSS_IntVec[USLOSS_ALARM_INT] = interruptCase;
     ///
 
 
@@ -177,7 +202,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     if(ProcSpace == 0){
         return -1;
     }
-    
+
 
     // fill-in entry in process table */
     if ( strlen(name) >= (MAXNAME - 1) ) {
