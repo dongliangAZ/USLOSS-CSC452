@@ -25,7 +25,7 @@ static void checkDeadlock();
 /* -------------------------- Globals ------------------------------------- */
 
 // Patrick's debugging global variable...
-int debugflag = 1;
+int debugflag = 0;
 int mydebugflag = 0;
 // the process table
 procStruct ProcTable[MAXPROC];
@@ -82,12 +82,34 @@ void interruptCase(int DEV, void* args){
 }
 
 
-void Interrupts(){
-
+void EnableInterrupts(){
+  if(DEBUG && debugflag){
+          USLOSS_Console("Enable the interrupts\n");
+      }
+      union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
+      if(psr.bits.curMode != 1){
+          USLOSS_Halt(1);
+      }
+      psr.bits.curIntEnable = 1;
+      if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
+          USLOSS_Console("Invalid psr");
+      }
+      if ((DEBUG && debugflag))
+        USLOSS_Console("psr = %d\n",psr.integerPart);
 }
 
-void noInterrupts(){
-
+void DisableInterrupts(){
+     if(DEBUG && debugflag){
+         USLOSS_Console("Disable the interrupts\n");
+     }
+     union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
+     if(psr.bits.curMode != 1){
+         USLOSS_Halt(1);
+     }
+     psr.bits.curIntEnable = 0;
+     if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
+         USLOSS_Console("Invalid psr");
+     }
 }
 
 
@@ -114,7 +136,7 @@ void startup(int argc, char *argv[])
     // Initialize the clock interrupt handler
     USLOSS_IntVec[USLOSS_ILLEGAL_INT] = interruptCase;
     USLOSS_IntVec[USLOSS_ALARM_INT] = interruptCase;
-    ///
+    EnableInterrupts();
 
 
 
