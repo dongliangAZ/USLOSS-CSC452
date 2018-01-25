@@ -115,7 +115,7 @@ void DisableInterrupts(){
 
 void startup(int argc, char *argv[])
 {
-    if(currentMode() == 0){
+    if(currentMode() != 1){
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
     }
@@ -203,7 +203,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
         USLOSS_Console("fork1(): creating process %s\n", name);
 
     // test if in kernel mode; halt if in user mode
-    if(currentMode() == 0){
+    if(currentMode() != 1){
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
     }
@@ -217,7 +217,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     int ProcSpace = 0;
     for(int i = 0; i < MAXPROC; i++){
         if(ProcTable[(nextPid + i)% MAXPROC] == -1){
-            ProcSpace = 1;
+            ProcSpace = 1;  //office hour += 1 or = 1 and why?
             break;
         }
     }
@@ -226,7 +226,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     }
 
 
-    // fill-in entry in process table */
+    /* fill-in entry in process table */
     if ( strlen(name) >= (MAXNAME - 1) ) {
         USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
         USLOSS_Halt(1);
