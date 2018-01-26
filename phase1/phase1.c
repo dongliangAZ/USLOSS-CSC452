@@ -25,8 +25,8 @@ static void checkDeadlock();
 /* -------------------------- Globals ------------------------------------- */
 
 // Patrick's debugging global variable...
-int debugflag = 0;
-int mydebugflag = 0;
+int debugflag = 1;
+int mydebugflag = 1;
 // the process table
 procStruct ProcTable[MAXPROC];
 
@@ -41,6 +41,8 @@ unsigned int nextPid = SENTINELPID;
 
 
 /* -------------------------- Functions ----------------------------------- */
+
+/*_____________OUR_METHODS________________*/
 /* ------------------------------------------------------------------------
    Name - currentMode
    Purpose - returns which mode you are in.
@@ -52,35 +54,35 @@ unsigned int nextPid = SENTINELPID;
 int currentMode()
 {
     union psrValues psr;
-    psr.integerPart = USLOSS_PsrGet()
-    return psr.bits.curMode
+    psr.integerPart = USLOSS_PsrGet();
+    return psr.bits.curMode;
 }
-
-/* ------------------------------------------------------------------------
-   Name - startup
-   Purpose - Initializes process lists and clock interrupt vector.
-             Start up sentinel process and the test process.
-   Parameters - argc and argv passed in by USLOSS
-   Returns - nothing
-   Side Effects - lots, starts the whole thing
-   Jan 17 (Not yet done)
-   ----------------------------------------------------------------------- */
 
 /*
  * CPUtime---return the time of CPU used by the current process
  */
 
-int CPUtime() {
-  if(USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, -1) == USLOSS_DEV_OK)
-      return -1;
-  else
-      return USLOSS_DEV_INVALID;
+// int CPUtime() {
+  // if(USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, -1) == USLOSS_DEV_OK)
+      // return -1;
+  // else
+      // return USLOSS_DEV_INVALID;
+// }
+
+
+void DisableInterrupts(){
+     if(DEBUG && debugflag){
+         USLOSS_Console("Disable the interrupts\n");
+     }
+     union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
+     if(psr.bits.curMode != 1){
+         USLOSS_Halt(1);
+     }
+     psr.bits.curIntEnable = 0;
+     if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
+         USLOSS_Console("Invalid psr");
+     }
 }
-
-void interruptCase(int DEV, void* args){
-
-}
-
 
 void EnableInterrupts(){
   if(DEBUG && debugflag){
@@ -98,36 +100,52 @@ void EnableInterrupts(){
         USLOSS_Console("psr = %d\n",psr.integerPart);
 }
 
-void DisableInterrupts(){
-     if(DEBUG && debugflag){
-         USLOSS_Console("Disable the interrupts\n");
-     }
-     union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
-     if(psr.bits.curMode != 1){
-         USLOSS_Halt(1);
-     }
-     psr.bits.curIntEnable = 0;
-     if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
-         USLOSS_Console("Invalid psr");
-     }
-}
+/*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
 
+
+
+
+
+
+
+
+
+/* ------------------------------------------------------------------------
+   Name - startup
+   Purpose - Initializes process lists and clock interrupt vector.
+             Start up sentinel process and the test process.
+   Parameters - argc and argv passed in by USLOSS
+   Returns - nothing
+   Side Effects - lots, starts the whole thing
+   Jan 17 (Not yet done)
+   ----------------------------------------------------------------------- */
 
 void startup(int argc, char *argv[])
 {
     if(currentMode() != 1){
-        printf("You are not in kernal mode");
-        USLOSS_Halt(1)
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
     } else {
-        EnableInterrupts()
+        EnableInterrupts();
     }
     int result; /* value returned by call to fork1() */
 
     /* initialize the process table */
     if (DEBUG && debugflag)
         USLOSS_Console("startup(): initializing process table, ProcTable[]\n");
-    for(int i=0;i<MAXPROC;i++)
-      ProcTable[i].status = UNUSED;
+    for(int i=0;i<MAXPROC;i++){
+        ProcTable[i].stack = NULL;
+        ProcTable[i].nextProcPtr = NULL;
+        ProcTable[i].childProcPtr = NULL;
+        ProcTable[i].name[0]= '\0';
+        ProcTable[i].startArg[0] = '\0';
+        //ProcTable[i].state = NULL;
+        ProcTable[i].pid = -1;
+        ProcTable[i].priority = -1;
+        ProcTable[i].stackSize = 0;
+        ProcTable[i].status = 0; // 0 is UNUSED
+    }
       /////////////////////
 
     // Initialize the Ready list, etc.
@@ -136,8 +154,8 @@ void startup(int argc, char *argv[])
     ReadyList = NULL;
 
     // Initialize the clock interrupt handler
-    USLOSS_IntVec[USLOSS_ILLEGAL_INT] = interruptCase;
-    USLOSS_IntVec[USLOSS_ALARM_INT] = interruptCase;
+    // USLOSS_IntVec[USLOSS_ILLEGAL_INT] = interruptCase;
+    // USLOSS_IntVec[USLOSS_ALARM_INT] = interruptCase;
     EnableInterrupts();
 
 
@@ -158,7 +176,7 @@ void startup(int argc, char *argv[])
     // start the test process
     if (DEBUG && debugflag)
         USLOSS_Console("startup(): calling fork1() for start1\n");
-    result = fork1("start1", start1, NULL, 2 * USLOSS_MIN_STACK, 1);
+    result = fork1("start1", start1, NULL, 2 * USLOSS_MIN_STACK, 1); //office hours
     if (result < 0) {
         USLOSS_Console("startup(): fork1 for start1 returned an error, ");
         USLOSS_Console("halting...\n");
@@ -180,6 +198,14 @@ void startup(int argc, char *argv[])
    ----------------------------------------------------------------------- */
 void finish(int argc, char *argv[])
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
+    
     if (DEBUG && debugflag)
         USLOSS_Console("in finish...\n");
 } /* finish */
@@ -199,7 +225,6 @@ void finish(int argc, char *argv[])
 int fork1(char *name, int (*startFunc)(char *), char *arg,
           int stacksize, int priority)
 {
-    int procSlot = -1;
 
     if (DEBUG && debugflag)
         USLOSS_Console("fork1(): creating process %s\n", name);
@@ -207,9 +232,9 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     // test if in kernel mode; halt if in user mode
     if(currentMode() != 1){
         printf("You are not in kernal mode");
-        USLOSS_Halt(1)
+        USLOSS_Halt(1);
     } else {
-        EnableInterrupts()
+        EnableInterrupts();
     }
 
     // Return if stack size is too small
@@ -218,9 +243,9 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     }
 
     // Is there room in the process table? What is the next PID?
-    int ProcSpace = 0;
+    int ProcSpace = -1;
     for(int i = 0; i < MAXPROC; i++){
-        if(ProcTable[(nextPid + i)% MAXPROC] == -1){
+        if(ProcTable[(nextPid + i)% MAXPROC].status == 0){ //checking if it is unused.
             ProcSpace = (nextPid + i);
             break;
         }
@@ -232,51 +257,50 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
 
 
     /* fill-in entry in process table */
-    proctStruct entry = ProcTable[nextPid];
-    entry.childProcPtr = null;
-    entry.nextSiblingPtr = null;
-    entry.name = name;
-    entry.stack = malloc(stackSize);
-    entry.pid = nextPid;
-    entry.priority = priority;
-    entry.stackSize = stacksize;
-    entry.status = 1;
+    procStruct *entry = &(ProcTable[ProcSpace]);
+    entry->childProcPtr = NULL;
+    entry->nextSiblingPtr = NULL;
+    entry->stack = malloc(stacksize);
+    entry->pid = ProcSpace;
+    entry->priority = priority;
+    entry->stackSize = stacksize;
+    entry->status = 1;
     
     
     if ( strlen(name) >= (MAXNAME - 1) ) {
         USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
         USLOSS_Halt(1);
     }
-    strcpy(ProcTable[procSlot].name, name);
-    ProcTable[procSlot].startFunc = startFunc;
+    strcpy(ProcTable[ProcSpace].name, name);
+    ProcTable[ProcSpace].startFunc = startFunc;
     if ( arg == NULL )
-        ProcTable[procSlot].startArg[0] = '\0';
+        ProcTable[ProcSpace].startArg[0] = '\0';
     else if ( strlen(arg) >= (MAXARG - 1) ) {
         USLOSS_Console("fork1(): argument too long.  Halting...\n");
         USLOSS_Halt(1);
     }
     else
-        strcpy(ProcTable[procSlot].startArg, arg);
+        strcpy(ProcTable[ProcSpace].startArg, arg);
 
     // Initialize context for this process, but use launch function pointer for
     // the initial value of the process's program counter (PC)
-
-    USLOSS_ContextInit(&(ProcTable[procSlot].state),
-                       ProcTable[procSlot].stack,
-                       ProcTable[procSlot].stackSize,
+USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace, &(ProcTable[ProcSpace].state), ProcTable[ProcSpace].stack, ProcTable[ProcSpace].stackSize);
+    USLOSS_ContextInit(&(ProcTable[ProcSpace].state),
+                       ProcTable[ProcSpace].stack,
+                       ProcTable[ProcSpace].stackSize,
                        NULL,
                        launch);
 
     // for future phase(s)
-    p1_fork(ProcTable[procSlot].pid);
+    p1_fork(ProcTable[ProcSpace].pid);
 
     // More stuff to do here...
-    if(nextPid%50 != 1){
+    if(ProcSpace%50 != 1){
         dispatcher();
     }
     
 
-    return -1;  // -1 is not correct! Here to prevent warning.
+    return entry->pid;  // -1 is not correct! Here to prevent warning.
 } /* fork1 */
 
 /* ------------------------------------------------------------------------
@@ -289,6 +313,14 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
    ------------------------------------------------------------------------ */
 void launch()
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
+    
     int result;
 
     if (DEBUG && debugflag)
@@ -321,6 +353,13 @@ void launch()
    ------------------------------------------------------------------------ */
 int join(int *status)
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
     return -1;  // -1 is not correct! Here to prevent warning.
 } /* join */
 
@@ -336,6 +375,13 @@ int join(int *status)
    ------------------------------------------------------------------------ */
 void quit(int status)
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
     p1_quit(Current->pid);
 } /* quit */
 
@@ -352,6 +398,13 @@ void quit(int status)
    ----------------------------------------------------------------------- */
 void dispatcher(void)
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
     procPtr nextProcess = NULL;
 
     p1_switch(Current->pid, nextProcess->pid);
@@ -371,6 +424,15 @@ void dispatcher(void)
    ----------------------------------------------------------------------- */
 int sentinel (char *dummy)
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag){
+            printf("You are not in kernal mode");
+        }
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
+    
     if (DEBUG && debugflag)
         USLOSS_Console("sentinel(): called\n");
     while (1)
@@ -384,16 +446,16 @@ int sentinel (char *dummy)
 /* check to determine if deadlock has occurred... */
 static void checkDeadlock()
 {
+    if(currentMode() != 1){
+        if (DEBUG && debugflag)
+            printf("You are not in kernal mode");
+        USLOSS_Halt(1);
+    } else {
+        EnableInterrupts();
+    }
 } /* checkDeadlock */
 
 
-/*
- * Disables the interrupts.
- */
-void disableInterrupts()
-{
-    // turn the interrupts OFF iff we are in kernel mode
-    // if not in kernel mode, print an error message and
-    // halt USLOSS
 
-} /* disableInterrupts */
+
+
