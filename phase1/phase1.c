@@ -118,6 +118,8 @@ void startup(int argc, char *argv[])
     if(currentMode() != 1){
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
+    } else {
+        EnableInterrupts()
     }
     int result; /* value returned by call to fork1() */
 
@@ -206,6 +208,8 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     if(currentMode() != 1){
         printf("You are not in kernal mode");
         USLOSS_Halt(1)
+    } else {
+        EnableInterrupts()
     }
 
     // Return if stack size is too small
@@ -217,16 +221,28 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     int ProcSpace = 0;
     for(int i = 0; i < MAXPROC; i++){
         if(ProcTable[(nextPid + i)% MAXPROC] == -1){
-            ProcSpace = 1;  //office hour += 1 or = 1 and why?
+            ProcSpace = (nextPid + i);
             break;
         }
+        if(i == MAXPROC-1){
+            return -1;
+        }
     }
-    if(ProcSpace == 0){
-        return -1;
-    }
+    nextPid = ProcSpace + 1; //This ensures that you are increasing the pid and jumping to the next possibe.
 
 
     /* fill-in entry in process table */
+    proctStruct entry = ProcTable[nextPid];
+    entry.childProcPtr = null;
+    entry.nextSiblingPtr = null;
+    entry.name = name;
+    entry.stack = malloc(stackSize);
+    entry.pid = nextPid;
+    entry.priority = priority;
+    entry.stackSize = stacksize;
+    entry.status = 1;
+    
+    
     if ( strlen(name) >= (MAXNAME - 1) ) {
         USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
         USLOSS_Halt(1);
@@ -255,6 +271,10 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     p1_fork(ProcTable[procSlot].pid);
 
     // More stuff to do here...
+    if(nextPid%50 != 1){
+        dispatcher();
+    }
+    
 
     return -1;  // -1 is not correct! Here to prevent warning.
 } /* fork1 */
