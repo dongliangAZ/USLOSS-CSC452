@@ -9,6 +9,7 @@ struct procStruct {
    procPtr         nextProcPtr;
    procPtr         childProcPtr;
    procPtr         nextSiblingPtr;
+   procPtr         nextInReadyList;
    char            name[MAXNAME];     /* process's name */
    char            startArg[MAXARG];  /* args passed to process */
    USLOSS_Context  state;             /* current context for process */
@@ -17,7 +18,15 @@ struct procStruct {
    int (* startFunc) (char *);   /* function where process begins -- launch */
    char           *stack;
    unsigned int    stackSize;
-   int             status;        /* READY, BLOCKED, QUIT, EMPTY, etc. */
+   int             status;        /* QUIT = -2, BLOCKED = -1,  UNUSED = 0, READY = 1, JOIN = 2 etc. */
+   /* added */
+   procPtr         quitChild;
+   int             quitVal;
+   short           parentpid;
+   int             cpuTime;
+   int             children;
+   int             zapped;
+   procPtr         zapList[MAXPROC];
    /* other fields as needed... */
 };
 

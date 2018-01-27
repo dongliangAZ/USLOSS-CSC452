@@ -42,7 +42,7 @@ unsigned int nextPid = SENTINELPID;
 
 /* -------------------------- Functions ----------------------------------- */
 
-/*_____________OUR_METHODS________________*/
+/*_____________OUR_FUNCTIONS________________*/
 /* ------------------------------------------------------------------------
    Name - currentMode
    Purpose - returns which mode you are in.
@@ -71,33 +71,66 @@ int currentMode()
 
 
 void DisableInterrupts(){
-     if(DEBUG && debugflag){
-         USLOSS_Console("Disable the interrupts\n");
-     }
-     union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
-     if(psr.bits.curMode != 1){
-         USLOSS_Halt(1);
-     }
-     psr.bits.curIntEnable = 0;
-     if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
-         USLOSS_Console("Invalid psr");
-     }
+    if ( (USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0 ) {
+      USLOSS_Console("Error:Not in the kernel mode.");
+      USLOSS_Halt(1);
+    }//if it is not in the kernel mode
+    else{
+      USLOSS_PsrSet( USLOSS_PsrGet() & ~USLOSS_PSR_CURRENT_INT );
+    }//in the kernel mode
 }
 
 void EnableInterrupts(){
-  if(DEBUG && debugflag){
-          USLOSS_Console("Enable the interrupts\n");
-      }
-      union psrValues psr = {.integerPart =  USLOSS_PsrGet()};
-      if(psr.bits.curMode != 1){
-          USLOSS_Halt(1);
-      }
-      psr.bits.curIntEnable = 1;
-      if(USLOSS_PsrSet(psr.integerPart) == USLOSS_ERR_INVALID_PSR){
-          USLOSS_Console("Invalid psr");
-      }
-      if ((DEBUG && debugflag))
-        USLOSS_Console("psr = %d\n",psr.integerPart);
+    if ( (USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0 ) {
+      USLOSS_Console("Error:Not in the kernel mode.");
+      USLOSS_Halt(1);
+    }//if it is not in the kernel mode
+    else{
+      USLOSS_PsrSet( USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
+    }//in the kernel mode
+}
+
+int isZapped() {
+    return Current->zapped;
+}
+
+/*
+ *Free everything for the input procPtr.
+ */
+void freePtr(procPtr p){
+  // empty out everything
+    p->nextProcPtr = NULL;
+    p->childProcPtr = NULL;
+    p->nextSiblingPtr = NULL;
+    p->quitChild = NULL;
+    strcpy(p->name, "");
+    p->startArg[0] = '\0';
+    p->pid = -1;
+    p->parentpid = -1;
+    p->priority = -1;
+    p->startFunc = NULL;
+    p->stack = NULL;
+    p->stackSize = -1;
+    p->status = 0;
+    //p->startTime = -1;
+    p->cpuTime = -1;
+    p->children = 0;
+    p->quitVal = -1;
+
+    for (int i = 0; i < MAXPROC; i++)
+        p->zapList[i] = NULL;
+
+}
+
+void readyListEntry(procPtr entry){
+    //sort by priority
+    //insert sort
+    //ReadyList will have initial blank head ptr.
+    
+}
+void readyListRemove(procPtr entry){
+    //ReadyList will have initial blank head ptr.
+    
 }
 
 /*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
@@ -138,6 +171,7 @@ void startup(int argc, char *argv[])
         ProcTable[i].stack = NULL;
         ProcTable[i].nextProcPtr = NULL;
         ProcTable[i].childProcPtr = NULL;
+        ProcTable[i].nextInReadyList = NULL;
         ProcTable[i].name[0]= '\0';
         ProcTable[i].startArg[0] = '\0';
         //ProcTable[i].state = NULL;
@@ -145,6 +179,14 @@ void startup(int argc, char *argv[])
         ProcTable[i].priority = -1;
         ProcTable[i].stackSize = 0;
         ProcTable[i].status = 0; // 0 is UNUSED
+        ProcTable[i].quitChild = NULL;
+        ProcTable[i].quitVal = -1;
+        ProcTable[i].parentpid = -1;
+        ProcTable[i].cpuTime = 0;
+        ProcTable[i].children = 0;
+        ProcTable[i].zapped = -1;
+        ProcTable[i].zapList[0] = '\0';
+        
     }
       /////////////////////
 
@@ -265,6 +307,13 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     entry->priority = priority;
     entry->stackSize = stacksize;
     entry->status = 1;
+    entry->quitChild = NULL;
+    entry->quitVal = -1;
+    entry->parentpid = -1;
+    entry->cpuTime = 0;
+    entry->children = 0;
+    entry->zapped = -1;
+    entry->zapList[0] = '\0';
     
     
     if ( strlen(name) >= (MAXNAME - 1) ) {
@@ -353,14 +402,43 @@ void launch()
    ------------------------------------------------------------------------ */
 int join(int *status)
 {
-    if(currentMode() != 1){
-        if (DEBUG && debugflag)
-            printf("You are not in kernal mode");
-        USLOSS_Halt(1);
-    } else {
-        EnableInterrupts();
+    DisableInterrupts();
+    // -1 if the process was zapped in the join
+    if (isZapped())
+        return -1;
+    //-2 if the process has no children
+    if (Current->childProcPtr == NULL && Current->quitChild == NULL)
+        return -2;
+
+    //Child(ren) quit() before the join() occurred.
+    if (Current->quitChild != NULL) {
+        procPtr temp = Current->quitChild;
+        Current->quitChild = temp->quitChild;
+
+        *status=temp-> quitVal;
+        int Pid = temp->pid;
+        freePtr(temp);
+
+        return Pid;
     }
-    return -1;  // -1 is not correct! Here to prevent warning.
+
+    //No(unjoined) child has quit() ...  must wait.
+    Current->status = 2;//Become blocked
+    dispatcher();//Call the dispatcher
+    DisableInterrupts();
+    //Then do the process again
+    if (isZapped())
+        return -1;
+    if (Current->childProcPtr == NULL && Current->quitChild == NULL)
+        return -2;
+    procPtr temp = Current->quitChild;
+    Current->quitChild = temp->quitChild;
+
+    *status=temp-> quitVal;
+    int Pid = temp->pid;
+    freePtr(temp);
+
+    return Pid;
 } /* join */
 
 
@@ -405,7 +483,7 @@ void dispatcher(void)
     } else {
         EnableInterrupts();
     }
-    procPtr nextProcess = NULL;
+    procPtr nextProcess = NULL;  //the readylist
 
     p1_switch(Current->pid, nextProcess->pid);
 } /* dispatcher */
