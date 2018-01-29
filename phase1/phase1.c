@@ -126,11 +126,11 @@ void readyListEntry(procPtr entry){
     //sort by priority
     //insert sort
     //ReadyList will have initial blank head ptr.
-    
+
 }
 void readyListRemove(procPtr entry){
     //ReadyList will have initial blank head ptr.
-    
+
 }
 
 /*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
@@ -186,7 +186,7 @@ void startup(int argc, char *argv[])
         ProcTable[i].children = 0;
         ProcTable[i].zapped = -1;
         ProcTable[i].zapList[0] = '\0';
-        
+
     }
       /////////////////////
 
@@ -247,7 +247,7 @@ void finish(int argc, char *argv[])
     } else {
         EnableInterrupts();
     }
-    
+
     if (DEBUG && debugflag)
         USLOSS_Console("in finish...\n");
 } /* finish */
@@ -314,8 +314,8 @@ int fork1(char *name, int (*startFunc)(char *), char *arg,
     entry->children = 0;
     entry->zapped = -1;
     entry->zapList[0] = '\0';
-    
-    
+
+
     if ( strlen(name) >= (MAXNAME - 1) ) {
         USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
         USLOSS_Halt(1);
@@ -347,7 +347,7 @@ USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace, &(Proc
     if(ProcSpace%50 != 1){
         dispatcher();
     }
-    
+
 
     return entry->pid;  // -1 is not correct! Here to prevent warning.
 } /* fork1 */
@@ -369,7 +369,7 @@ void launch()
     } else {
         EnableInterrupts();
     }
-    
+
     int result;
 
     if (DEBUG && debugflag)
@@ -452,7 +452,7 @@ int join(int *status)
    Side Effects - changes the parent of pid child completion status list.
    ------------------------------------------------------------------------ */
 void quit(int status)
-{
+{   /*
     if(currentMode() != 1){
         if (DEBUG && debugflag)
             printf("You are not in kernal mode");
@@ -461,6 +461,65 @@ void quit(int status)
         EnableInterrupts();
     }
     p1_quit(Current->pid);
+    */
+    if (DEBUG && debugflag)
+        USLOSS_Console("Error: quit(): process %d called quit()\n",Current->pid);
+
+    if ( (USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0 ) {
+          USLOSS_Console("Error:quit() is called when not in the kernel mode.");
+          USLOSS_Halt(1);
+        }//if it is not in the kernel mode
+
+    DisableInterrupts();
+    if (Current->childProcPtr != NULL) {
+          USLOSS_Console("Error: if a process with active children calls quit()");
+          USLOSS_Halt(1);
+      }
+      /*Set the current's status*/
+    Current->status=QUIT;
+    Current->quitVal=status;
+    p1_quit(Current->pid);
+      /*if there is any dead children*/
+    int deadChildren=0;
+    if(Current->quitChild!=NULL)
+    deadChildren=1;
+      /*if current has parrent or not*/
+    int hasParent =1;
+    if(Current->parentpid == 0)
+    hasParent=0;
+
+    if(deadChildren){
+      while(Current->quitChild != NULL){
+        procPtr temp = Current->quitChild;
+        freePtr(temp);
+        Current->quitChild = temp->quitChild;
+        temp->quitChild = Null;
+      }
+
+    if(hasParent)
+        procPtr temp = &ProcTable[Current->parentpid%50];//The pointer point to the parent.
+        procPtr next;
+        for(next=temp;next->quitChild != NUll; next = next->quitChild)
+        ;
+        next->quitChild=Current;//moce current to the end of the parent's list.
+
+        if(temp->childProcPtr->pid == Current->pid){
+          //swap
+          procPtr t = Current->nextSiblingPtr;
+          temp->childProcPtr = t;
+        }else{
+          procPtr before;
+          for(before=temp->childProcPtr;before->nextSiblingPtr != NULL; before = before->nextSiblingPtr)
+            if(before->nextSiblingPtr->pid == Current->pid){
+              before->nextSiblingPtr =Current->nextSiblingPtr;
+              Current->nextSiblingPtr = NULL;
+              break;
+            }
+        }
+        temp->children--;
+    }
+
+    dispatcher();
 } /* quit */
 
 
@@ -510,7 +569,7 @@ int sentinel (char *dummy)
     } else {
         EnableInterrupts();
     }
-    
+
     if (DEBUG && debugflag)
         USLOSS_Console("sentinel(): called\n");
     while (1)
@@ -532,8 +591,3 @@ static void checkDeadlock()
         EnableInterrupts();
     }
 } /* checkDeadlock */
-
-
-
-
-
