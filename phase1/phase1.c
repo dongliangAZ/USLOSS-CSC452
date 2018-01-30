@@ -493,7 +493,7 @@ void quit(int status)
         procPtr temp = Current->quitChild;
         freePtr(temp);
         Current->quitChild = temp->quitChild;
-        temp->quitChild = Null;
+        temp->quitChild = NULL;
       }
 
     if(hasParent)
@@ -542,7 +542,7 @@ void dispatcher(void)
     } else {
         EnableInterrupts();
     }
-    procPtr nextProcess = NULL;  //the readylist
+    procPtr nextProcess = ReadyList.nextInReadyList;  //the readylist
 
     p1_switch(Current->pid, nextProcess->pid);
 } /* dispatcher */
