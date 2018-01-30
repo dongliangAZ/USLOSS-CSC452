@@ -32,6 +32,8 @@ procStruct ProcTable[MAXPROC];
 
 // Process lists
 static procPtr ReadyList;
+procPtr head;
+head.nextInReadyList = NULL;
 
 // current process ID
 procPtr Current;
@@ -126,11 +128,36 @@ void readyListEntry(procPtr entry){
     //sort by priority
     //insert sort
     //ReadyList will have initial blank head ptr.
+    if(head.nextInReadyList == NULL){
+        head.nextInReadyList = entry;
+    } else {
+       procPtr next = head;
+       while(next.nextInReadyList != NULL && next.nextInReadyList.priority > entry.priority) {
+           if(next.nextInReadyList != NULL){
+               next.nextInReadyList = entry;
+           } else {
+               procPtr tmp = next.nextInReadyList;
+               next.nextInReadyList = entry;
+               next.nextInReadyList.nextInReadyList = tmp;
+           }
+       }
+    }
+    
 
 }
 void readyListRemove(procPtr entry){
     //ReadyList will have initial blank head ptr.
-
+    while(next.nextInReadyList != NULL && next.nextInReadyList != entry) {
+        if(next.nextInReadyList != NULL){
+            exit(-1);
+        } else {
+            if(next.nextInReadyList.nextInReadyList != NULL){
+                next.nextInReadyList = next.nextInReadyList.nextInReadyList;
+            } else {
+                next.nextInReadyList = NULL;
+            }
+        }
+    }
 }
 
 /*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
