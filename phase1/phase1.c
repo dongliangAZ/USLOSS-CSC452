@@ -33,7 +33,6 @@ procStruct ProcTable[MAXPROC];
 // Process lists
 static procPtr ReadyList;
 procPtr head;
-head.nextInReadyList = NULL;
 
 // current process ID
 procPtr Current;
@@ -128,17 +127,17 @@ void readyListEntry(procPtr entry){
     //sort by priority
     //insert sort
     //ReadyList will have initial blank head ptr.
-    if(head.nextInReadyList == NULL){
-        head.nextInReadyList = entry;
+    if(head == NULL){
+        head->nextInReadyList = entry;
     } else {
        procPtr next = head;
-       while(next.nextInReadyList != NULL && next.nextInReadyList.priority > entry.priority) {
-           if(next.nextInReadyList != NULL){
-               next.nextInReadyList = entry;
+       while(next->nextInReadyList != NULL && next->nextInReadyList->priority > entry->priority) {
+           if(next->nextInReadyList != NULL){
+               next->nextInReadyList = entry;
            } else {
-               procPtr tmp = next.nextInReadyList;
-               next.nextInReadyList = entry;
-               next.nextInReadyList.nextInReadyList = tmp;
+               procPtr tmp = next->nextInReadyList;
+               next->nextInReadyList = entry;
+               next->nextInReadyList->nextInReadyList = tmp;
            }
        }
     }
@@ -146,15 +145,16 @@ void readyListEntry(procPtr entry){
 
 }
 void readyListRemove(procPtr entry){
-    //ReadyList will have initial blank head ptr.
-    while(next.nextInReadyList != NULL && next.nextInReadyList != entry) {
-        if(next.nextInReadyList != NULL){
+    //ReadyList will have initial blank head ptr->
+    procPtr next = head;
+    while(next->nextInReadyList != NULL && next->nextInReadyList != entry) {
+        if(next->nextInReadyList != NULL){
             exit(-1);
         } else {
-            if(next.nextInReadyList.nextInReadyList != NULL){
-                next.nextInReadyList = next.nextInReadyList.nextInReadyList;
+            if(next->nextInReadyList->nextInReadyList != NULL){
+                next->nextInReadyList = next->nextInReadyList->nextInReadyList;
             } else {
-                next.nextInReadyList = NULL;
+                next->nextInReadyList = NULL;
             }
         }
     }
@@ -489,6 +489,8 @@ void quit(int status)
     }
     p1_quit(Current->pid);
     */
+    
+    procPtr temp;
     if (DEBUG && debugflag)
         USLOSS_Console("Error: quit(): process %d called quit()\n",Current->pid);
 
@@ -517,16 +519,16 @@ void quit(int status)
 
     if(deadChildren){
       while(Current->quitChild != NULL){
-        procPtr temp = Current->quitChild;
+        temp = Current->quitChild;
         freePtr(temp);
         Current->quitChild = temp->quitChild;
         temp->quitChild = NULL;
       }
 
     if(hasParent)
-        procPtr temp = &ProcTable[Current->parentpid%50];//The pointer point to the parent.
+        temp = &ProcTable[Current->parentpid%50];//The pointer point to the parent.
         procPtr next;
-        for(next=temp;next->quitChild != NUll; next = next->quitChild)
+        for(next=temp;next->quitChild != NULL; next = next->quitChild)
         ;
         next->quitChild=Current;//moce current to the end of the parent's list.
 
@@ -569,7 +571,7 @@ void dispatcher(void)
     } else {
         EnableInterrupts();
     }
-    procPtr nextProcess = ReadyList.nextInReadyList;  //the readylist
+    procPtr nextProcess = ReadyList->nextInReadyList;  //the readylist
 
     p1_switch(Current->pid, nextProcess->pid);
 } /* dispatcher */
