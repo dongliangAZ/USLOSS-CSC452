@@ -32,7 +32,7 @@ procStruct ProcTable[MAXPROC];
 
 // Process lists
 static procPtr ReadyList;
-procPtr head;
+procPtr head = NULL;
 
 // current process ID
 procPtr Current;
@@ -128,6 +128,23 @@ void readyListEntry(procPtr entry){
     //insert sort
     //ReadyList will have initial blank head ptr.
     if(head == NULL){
+        head->nextProcPtr = NULL;
+    head->childProcPtr = NULL;
+    head->nextSiblingPtr = NULL;
+    head->quitChild = NULL;
+    strcpy(head->name, "");
+    head->startArg[0] = '\0';
+    head->pid = -1;
+    head->parentpid = -1;
+    head->priority = -1;
+    head->startFunc = NULL;
+    head->stack = NULL;
+    head->stackSize = -1;
+    head->status = 0;
+    //head->startTime = -1;
+    head->cpuTime = -1;
+    head->children = 0;
+    head->quitVal = -1;
         head->nextInReadyList = entry;
     } else {
        procPtr next = head;
@@ -369,7 +386,9 @@ USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace, &(Proc
 
     // for future phase(s)
     p1_fork(ProcTable[ProcSpace].pid);
-
+    
+    readyListEntry(&ProcTable[ProcSpace]);
+    
     // More stuff to do here...
     if(ProcSpace%50 != 1){
         dispatcher();
@@ -528,8 +547,7 @@ void quit(int status)
     if(hasParent)
         temp = &ProcTable[Current->parentpid%50];//The pointer point to the parent.
         procPtr next;
-        for(next=temp;next->quitChild != NULL; next = next->quitChild)
-        ;
+        for(next=temp;next->quitChild != NULL; next = next->quitChild);
         next->quitChild=Current;//moce current to the end of the parent's list.
 
         if(temp->childProcPtr->pid == Current->pid){
@@ -571,8 +589,8 @@ void dispatcher(void)
     } else {
         EnableInterrupts();
     }
-    procPtr nextProcess = ReadyList->nextInReadyList;  //the readylist
-
+    procPtr nextProcess = ReadyList->nextInReadyList;  //the readylist'
+    
     p1_switch(Current->pid, nextProcess->pid);
 } /* dispatcher */
 
