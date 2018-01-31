@@ -77,7 +77,7 @@ void DisableInterrupts(){
       USLOSS_Halt(1);
     }//if it is not in the kernel mode
     else{
-      USLOSS_PsrSet( USLOSS_PsrGet() & ~USLOSS_PSR_CURRENT_INT );
+     // USLOSS_PsrSet( USLOSS_PsrGet() & ~USLOSS_PSR_CURRENT_INT );
     }//in the kernel mode
 }
 
@@ -87,7 +87,7 @@ void EnableInterrupts(){
       USLOSS_Halt(1);
     }//if it is not in the kernel mode
     else{
-      USLOSS_PsrSet( USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
+      //USLOSS_PsrSet( USLOSS_PsrGet() | USLOSS_PSR_CURRENT_INT);
     }//in the kernel mode
 }
 
