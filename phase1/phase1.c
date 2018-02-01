@@ -31,7 +31,6 @@ procStruct ProcTable[MAXPROC];
 
 // Process lists
 static procPtr ReadyList;
-procPtr head = NULL;
 
 // current process ID
 procPtr Current;
@@ -123,43 +122,24 @@ void readyListEntry(procPtr entry) {
 	//sort by priority
 	//insert sort
 	//ReadyList will have initial blank head ptr.
-	if (head == NULL) {
-		head->nextProcPtr = NULL;
-		head->childProcPtr = NULL;
-		head->nextSiblingPtr = NULL;
-		head->quitChild = NULL;
-		strcpy(head->name, "");
-		head->startArg[0] = '\0';
-		head->pid = -1;
-		head->parentpid = -1;
-		head->priority = -1;
-		head->startFunc = NULL;
-		head->stack = NULL;
-		head->stackSize = -1;
-		head->status = 0;
-		//head->startTime = -1;
-		head->cpuTime = -1;
-		head->children = 0;
-		head->quitVal = -1;
-		head->nextInReadyList = entry;
+	if (ReadyList == NULL) {
+		ReadyList = entry;
 	} else {
-		procPtr next = head;
-		while (next->nextInReadyList != NULL
-				&& next->nextInReadyList->priority > entry->priority) {
-			if (next->nextInReadyList != NULL) {
+		procPtr next = ReadyList;
+		while (next->nextInReadyList != NULL && next->nextInReadyList->priority > entry->priority);
+        if (next->nextInReadyList != NULL) {
 				next->nextInReadyList = entry;
-			} else {
-				procPtr tmp = next->nextInReadyList;
-				next->nextInReadyList = entry;
-				next->nextInReadyList->nextInReadyList = tmp;
-			}
-		}
+		} else {
+			procPtr tmp = next->nextInReadyList;
+			next->nextInReadyList = entry;
+			next->nextInReadyList->nextInReadyList = tmp;
+        }
 	}
 
 }
 void readyListRemove(procPtr entry) {
 	//ReadyList will have initial blank head ptr->
-	procPtr next = head;
+	procPtr next = ReadyList;
 	while (next->nextInReadyList != NULL && next->nextInReadyList != entry) {
 		if (next->nextInReadyList != NULL) {
 			exit(-1);
@@ -565,8 +545,11 @@ void dispatcher(void) {
 		EnableInterrupts();
 	}
 	procPtr nextProcess = ReadyList->nextInReadyList;  //the readylist'
-
-	p1_switch(Current->pid, nextProcess->pid);
+    if(Current == NULL){
+        p1_switch(-1, nextProcess->pid);
+    } else {
+        p1_switch(Current->pid, nextProcess->pid);
+    }
 } /* dispatcher */
 
 /* ------------------------------------------------------------------------
