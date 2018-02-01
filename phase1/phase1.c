@@ -25,7 +25,7 @@ static void checkDeadlock();
 
 // Patrick's debugging global variable...
 int debugflag = 1;
-int mydebugflag = 1;
+int other_debug_flag = 1;
 // the process table
 procStruct ProcTable[MAXPROC];
 
@@ -167,7 +167,7 @@ void readyListRemove(procPtr entry) {
 
 void startup(int argc, char *argv[]) {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag)
+		if (other_debug_flag && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
@@ -176,7 +176,7 @@ void startup(int argc, char *argv[]) {
 	int result; /* value returned by call to fork1() */
 
 	/* initialize the process table */
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("startup(): initializing process table, ProcTable[]\n");
 	for (int i = 0; i < MAXPROC; i++) {
 		ProcTable[i].stack = NULL;
@@ -202,7 +202,7 @@ void startup(int argc, char *argv[]) {
 	/////////////////////
 
 	// Initialize the Ready list, etc.
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("startup(): initializing the Ready list\n");
 	ReadyList = NULL;
 
@@ -212,12 +212,12 @@ void startup(int argc, char *argv[]) {
 	EnableInterrupts();
 
 	// startup a sentinel process
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("startup(): calling fork1() for sentinel\n");
 	result = fork1("sentinel", sentinel, NULL, USLOSS_MIN_STACK,
 			SENTINELPRIORITY);
 	if (result < 0) {
-		if (DEBUG && debugflag) {
+		if (other_debug_flag && debugflag) {
 			USLOSS_Console("startup(): fork1 of sentinel returned error, ");
 			USLOSS_Console("halting...\n");
 		}
@@ -225,7 +225,7 @@ void startup(int argc, char *argv[]) {
 	}
 
 	// start the test process
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("startup(): calling fork1() for start1\n");
 	result = fork1("start1", start1, NULL, 2 * USLOSS_MIN_STACK, 1); //office hours
 	if (result < 0) {
@@ -234,7 +234,7 @@ void startup(int argc, char *argv[]) {
 		USLOSS_Halt(1);
 	}
 
-	USLOSS_Console("startup(): Should not see this message! ");
+	USLOSS_Console("startup(): Should not see this message! \n");
 	USLOSS_Console("Returned from fork1 call that created start1\n");
 
 	return;
@@ -249,14 +249,14 @@ void startup(int argc, char *argv[]) {
  ----------------------------------------------------------------------- */
 void finish(int argc, char *argv[]) {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag)
+		if (other_debug_flag && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
 		EnableInterrupts();
 	}
 
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("in finish...\n");
 } /* finish */
 
@@ -275,7 +275,7 @@ void finish(int argc, char *argv[]) {
 int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 		int priority) {
 
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("fork1(): creating process %s\n", name);
 
 	// test if in kernel mode; halt if in user mode
@@ -367,7 +367,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
  ------------------------------------------------------------------------ */
 void launch() {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag)
+		if (other_debug_flag && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
@@ -376,7 +376,7 @@ void launch() {
 
 	int result;
 
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("launch(): started\n");
 
 	// Enable interrupts
@@ -384,7 +384,7 @@ void launch() {
 	// Call the function passed to fork1, and capture its return value
 	result = Current->startFunc(Current->startArg);
 
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("Process %d returned to launch\n", Current->pid);
 
 	quit(result);
@@ -454,7 +454,7 @@ int join(int *status) {
  ------------------------------------------------------------------------ */
 void quit(int status) { /*
  if(currentMode() != 1){
- if (DEBUG && debugflag)
+ if (other_debug_flag && debugflag)
  printf("You are not in kernal mode");
  USLOSS_Halt(1);
  } else {
@@ -464,7 +464,7 @@ void quit(int status) { /*
  */
 
 	procPtr temp;
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("Error: quit(): process %d called quit()\n",
 				Current->pid);
 
@@ -538,7 +538,7 @@ void quit(int status) { /*
  ----------------------------------------------------------------------- */
 void dispatcher(void) {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag)
+		if (other_debug_flag && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
@@ -565,7 +565,7 @@ void dispatcher(void) {
  ----------------------------------------------------------------------- */
 int sentinel(char *dummy) {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag) {
+		if (other_debug_flag && debugflag) {
 			printf("You are not in kernal mode");
 		}
 		USLOSS_Halt(1);
@@ -573,7 +573,7 @@ int sentinel(char *dummy) {
 		EnableInterrupts();
 	}
 
-	if (DEBUG && debugflag)
+	if (other_debug_flag && debugflag)
 		USLOSS_Console("sentinel(): called\n");
 	while (1) {
 		checkDeadlock();
@@ -584,7 +584,7 @@ int sentinel(char *dummy) {
 /* check to determine if deadlock has occurred... */
 static void checkDeadlock() {
 	if (currentMode() != 1) {
-		if (DEBUG && debugflag)
+		if (other_debug_flag && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
