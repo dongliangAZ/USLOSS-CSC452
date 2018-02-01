@@ -108,11 +108,10 @@ void freePtr(procPtr p) {
 	p->stack = NULL;
 	p->stackSize = -1;
 	p->status = 0;
-	//p->startTime = -1;
 	p->cpuTime = -1;
 	p->children = 0;
 	p->quitVal = -1;
-
+  p->time = -1;
 	for (int i = 0; i < MAXPROC; i++)
 		p->zapList[i] = NULL;
 
@@ -180,7 +179,7 @@ int zap(int pid){
    zapped->zapList[i]=Current;
    zapped->zapped=1;
 
-   Current->status=BLOCKED;//Or blocked by zap.
+   Current->status=3;//Or blocked by zap.
    //Since blocked,we call dispatcher
    dispatcher();
 
@@ -195,7 +194,7 @@ int zap(int pid){
    return -1;
    else
    return 0;
-}
+}/*int zap(pid)*/
 
 
 
@@ -360,7 +359,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 	entry->pid = ProcSpace;
 	entry->priority = priority;
 	entry->stackSize = stacksize;
-	entry->status = 1;
+	entry->status = 0;
 	entry->quitChild = NULL;
 	entry->quitVal = -1;
 	entry->parentpid = -1;
@@ -368,6 +367,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 	entry->children = 0;
 	entry->zapped = -1;
 	entry->zapList[0] = '\0';
+  entry->time = 0;
 
 	if (strlen(name) >= (MAXNAME - 1)) {
 		USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
@@ -468,19 +468,21 @@ int join(int *status) {
 		*status = temp->quitVal;
 		int Pid = temp->pid;
 		freePtr(temp);
-
 		return Pid;
 	}
 
 	//No(unjoined) child has quit() ...  must wait.
-	Current->status = 2;  //Become blocked
+	Current->status = JOIN;  //Become blocked
 	dispatcher();  //Call the dispatcher
 	DisableInterrupts();
 	//Then do the process again
-	if (isZapped())
+	if (isZapped()){
 		return -1;
-	if (Current->childProcPtr == NULL && Current->quitChild == NULL)
+	}
+	else if (Current->childProcPtr == NULL && Current->quitChild == NULL){
 		return -2;
+	}
+	else{
 	procPtr temp = Current->quitChild;
 	Current->quitChild = temp->quitChild;
 
@@ -489,6 +491,7 @@ int join(int *status) {
 	freePtr(temp);
 
 	return Pid;
+ }
 } /* join */
 
 /* ------------------------------------------------------------------------
@@ -512,10 +515,12 @@ void quit(int status) { /*
  */
 
 	procPtr temp;
-	if (other_debug_flag && debugflag)
-		USLOSS_Console("Error: quit(): process %d called quit()\n",
-				Current->pid);
+	int deadChildren = 0;
+	int hasParent = 1;
 
+	if (other_debug_flag && debugflag){
+		USLOSS_Console("Error:In quit(): process %d called quit()\n",Current->pid);
+	}
 	if ((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0) {
 		USLOSS_Console("Error:quit() is called when not in the kernel mode.");
 		USLOSS_Halt(1);
@@ -527,15 +532,15 @@ void quit(int status) { /*
 		USLOSS_Halt(1);
 	}
 	/*Set the current's status*/
-	Current->status = QUIT;
 	Current->quitVal = status;
+	Current->status = 1;
+
 	p1_quit(Current->pid);
 	/*if there is any dead children*/
-	int deadChildren = 0;
 	if (Current->quitChild != NULL)
 		deadChildren = 1;
 	/*if current has parrent or not*/
-	int hasParent = 1;
+
 	if (Current->parentpid == 0)
 		hasParent = 0;
 
@@ -548,7 +553,7 @@ void quit(int status) { /*
 		}
 
 		if (hasParent)
-			temp = &ProcTable[Current->parentpid % 50]; //The pointer point to the parent.
+		temp = &ProcTable[Current->parentpid % 50]; //The pointer point to the parent.
 		procPtr next;
 		for (next = temp; next->quitChild != NULL; next = next->quitChild)
 			;
@@ -638,4 +643,53 @@ static void checkDeadlock() {
 	} else {
 		EnableInterrupts();
 	}
+  int i=0;
+	int running=0;int ready=0;
+
+	for(;i<MAXPROC;i++){
+		if(ProcTable[i].status==0){
+			running++;
+			ready++;
+		}
+		else if(ProcTable[i].status==3||ProcTable[i].status == 2){
+			running++;
+		}
+		else{
+
+		}
+	}
+/*1.this is normal termination of USLOSS and ends with USLOSS_Halt(0).*/
+/*2. If checkDeadlock determines that there are process(es) other than the sentinel process
+ this is abnormal termination of USLOSS and ends with USLOSS_Halt(1).*/
+/*phase1-v1.0*/
+   if(ready==1){
+		 if(running==1){
+		 		USLOSS_Halt(0);//normal
+			}
+		 else{
+				USLOSS_Console("In checkDeadlock(): abnormal termination of USLOSS and ends with USLOSS_Halt(1).");
+        USLOSS_Halt(1);
+			}
+	 }
+
+	 else{
+
+	 }
+
 } /* checkDeadlock */
+
+/*
+ *In "phase1-notes-one" says:
+ *Initialize the appropriate slot to point to your clock handler function.
+ *      USLOSS_IntVec[USLOSS_CLOCK_DEV] = clockHandle;
+ *Do this at function Startup() maybe?
+ */
+static void clockHandler(int dev, void *arg) {
+    if (DEBUG && debugflag)
+        USLOSS_Console("clockHandler!\n");
+    int timeDiff = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &(Current->status)) - Current->time;//Not sure this is correct.
+		if(timeDiff >= 80000 )
+				dispatcher();
+		// If the current process has exceeded its time slice then call the dispatcher().
+		//timeSlice is 80ms = 80000us.
+}/*clockHandle*/

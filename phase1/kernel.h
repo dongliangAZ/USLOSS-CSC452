@@ -18,7 +18,7 @@ struct procStruct {
    int (* startFunc) (char *);   /* function where process begins -- launch */
    char           *stack;
    unsigned int    stackSize;
-   int             status;        /* QUIT = -2, BLOCKED = -1,  UNUSED = 0, READY = 1, JOIN = 2 etc. */
+   int             status;        /* QUIT = -2,   UNUSED = 0, READY = 0, JOIN = 2 etc. */
    /* added */
    procPtr         quitChild;
    int             quitVal;
@@ -27,6 +27,7 @@ struct procStruct {
    int             children;
    int             zapped;
    procPtr         zapList[MAXPROC];
+   int             time;
    /* other fields as needed... */
 };
 
@@ -53,5 +54,4 @@ union psrValues {
 //
 #define QUIT -2
 #define JOIN 2
-#define BLOCKED -1
-#define READY 0
+#define ZAP 3
