@@ -1,5 +1,5 @@
 /* Patrick's DEBUG printing constant... test */
-#define DEBUG 0
+#define DEBUG 1
 
 typedef struct procStruct procStruct;
 
@@ -18,7 +18,7 @@ struct procStruct {
    int (* startFunc) (char *);   /* function where process begins -- launch */
    char           *stack;
    unsigned int    stackSize;
-   int             status;        /* QUIT = -2,   UNUSED = 0, READY = 0, JOIN = 2 etc. */
+   int             status;        /* QUIT = -2,   CURRENT = 7 UNUSED = 0, READY = 0, JOIN = 2 etc. */
    /* added */
    procPtr         quitChild;
    int             quitVal;

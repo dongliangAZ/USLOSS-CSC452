@@ -25,7 +25,6 @@ static void checkDeadlock();
 
 // Patrick's debugging global variable...
 int debugflag = 1;
-int other_debug_flag = 1;
 // the process table
 procStruct ProcTable[MAXPROC];
 
@@ -125,7 +124,9 @@ void readyListEntry(procPtr entry) {
 		ReadyList = entry;
 	} else {
 		procPtr next = ReadyList;
-		while (next->nextInReadyList != NULL && next->nextInReadyList->priority > entry->priority);
+		while (next->nextInReadyList != NULL && next->nextInReadyList->priority > entry->priority){
+            next = next->nextInReadyList;
+        }
         if (next->nextInReadyList != NULL) {
 				next->nextInReadyList = entry;
 		} else {
@@ -139,6 +140,7 @@ void readyListEntry(procPtr entry) {
 void readyListRemove(procPtr entry) {
 	//ReadyList will have initial blank head ptr->
 	procPtr next = ReadyList;
+    entry->status = 7; //setting it to current
 	while (next->nextInReadyList != NULL && next->nextInReadyList != entry) {
 		if (next->nextInReadyList != NULL) {
 			exit(-1);
@@ -214,7 +216,7 @@ int zap(int pid){
 
 void startup(int argc, char *argv[]) {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag)
+		if (DEBUG && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
@@ -223,7 +225,7 @@ void startup(int argc, char *argv[]) {
 	int result; /* value returned by call to fork1() */
 
 	/* initialize the process table */
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("startup(): initializing process table, ProcTable[]\n");
 	for (int i = 0; i < MAXPROC; i++) {
 		ProcTable[i].stack = NULL;
@@ -249,7 +251,7 @@ void startup(int argc, char *argv[]) {
 	/////////////////////
 
 	// Initialize the Ready list, etc.
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("startup(): initializing the Ready list\n");
 	ReadyList = NULL;
 
@@ -259,12 +261,12 @@ void startup(int argc, char *argv[]) {
 	EnableInterrupts();
 
 	// startup a sentinel process
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("startup(): calling fork1() for sentinel\n");
 	result = fork1("sentinel", sentinel, NULL, USLOSS_MIN_STACK,
 			SENTINELPRIORITY);
 	if (result < 0) {
-		if (other_debug_flag && debugflag) {
+		if (DEBUG && debugflag) {
 			USLOSS_Console("startup(): fork1 of sentinel returned error, ");
 			USLOSS_Console("halting...\n");
 		}
@@ -272,7 +274,7 @@ void startup(int argc, char *argv[]) {
 	}
 
 	// start the test process
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("startup(): calling fork1() for start1\n");
 	result = fork1("start1", start1, NULL, 2 * USLOSS_MIN_STACK, 1); //office hours
 	if (result < 0) {
@@ -296,14 +298,14 @@ void startup(int argc, char *argv[]) {
  ----------------------------------------------------------------------- */
 void finish(int argc, char *argv[]) {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag)
+		if (DEBUG && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
 		EnableInterrupts();
 	}
 
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("in finish...\n");
 } /* finish */
 
@@ -322,7 +324,7 @@ void finish(int argc, char *argv[]) {
 int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 		int priority) {
 
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("fork1(): creating process %s\n", name);
 
 	// test if in kernel mode; halt if in user mode
@@ -385,16 +387,34 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 
 	// Initialize context for this process, but use launch function pointer for
 	// the initial value of the process's program counter (PC)
-	USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace,
+    if (DEBUG && debugflag){
+        USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace,
 			&(ProcTable[ProcSpace].state), ProcTable[ProcSpace].stack,
 			ProcTable[ProcSpace].stackSize);
+    }
 	USLOSS_ContextInit(&(ProcTable[ProcSpace].state),
 			ProcTable[ProcSpace].stack, ProcTable[ProcSpace].stackSize, NULL,
 			launch);
 
 	// for future phase(s)
 	p1_fork(ProcTable[ProcSpace].pid);
-
+    //adds parent to child and vice versa
+    if(Current != NULL){
+        //setting parent pid
+        ProcTable[ProcSpace].parentpid = Current->pid;
+        if(Current->childProcPtr == NULL){
+            Current->childProcPtr = &(ProcTable[ProcSpace]);
+        } else {
+            if(Current->childProcPtr->nextSiblingPtr != NULL){
+                procPtr tmp = Current->childProcPtr->nextSiblingPtr;
+                Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
+                Current->childProcPtr->nextSiblingPtr->nextSiblingPtr = tmp;
+            } else {
+                Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
+            }
+        }
+    }
+    
 	readyListEntry(&ProcTable[ProcSpace]);
 
 	// More stuff to do here...
@@ -415,7 +435,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
  ------------------------------------------------------------------------ */
 void launch() {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag)
+		if (DEBUG && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
@@ -424,7 +444,7 @@ void launch() {
 
 	int result;
 
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("launch(): started\n");
 
 	// Enable interrupts
@@ -432,7 +452,7 @@ void launch() {
 	// Call the function passed to fork1, and capture its return value
 	result = Current->startFunc(Current->startArg);
 
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("Process %d returned to launch\n", Current->pid);
 
 	quit(result);
@@ -503,22 +523,21 @@ int join(int *status) {
  Returns - nothing
  Side Effects - changes the parent of pid child completion status list.
  ------------------------------------------------------------------------ */
-void quit(int status) { /*
+void quit(int status) { 
  if(currentMode() != 1){
- if (other_debug_flag && debugflag)
+ if (DEBUG && debugflag)
  printf("You are not in kernal mode");
  USLOSS_Halt(1);
  } else {
  EnableInterrupts();
  }
  p1_quit(Current->pid);
- */
 
 	procPtr temp;
 	int deadChildren = 0;
 	int hasParent = 1;
 
-	if (other_debug_flag && debugflag){
+	if (DEBUG && debugflag){
 		USLOSS_Console("Error:In quit(): process %d called quit()\n",Current->pid);
 	}
 	if ((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0) {
@@ -533,7 +552,7 @@ void quit(int status) { /*
 	}
 	/*Set the current's status*/
 	Current->quitVal = status;
-	Current->status = 1;
+	Current->status = -2;
 
 	p1_quit(Current->pid);
 	/*if there is any dead children*/
@@ -541,7 +560,7 @@ void quit(int status) { /*
 		deadChildren = 1;
 	/*if current has parrent or not*/
 
-	if (Current->parentpid == 0)
+	if (Current->parentpid == -1)
 		hasParent = 0;
 
 	if (deadChildren) {
@@ -591,18 +610,38 @@ void quit(int status) { /*
  ----------------------------------------------------------------------- */
 void dispatcher(void) {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag)
+		if (DEBUG && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
 		EnableInterrupts();
 	}
-	procPtr nextProcess = ReadyList->nextInReadyList;  //the readylist'
+    if(Current != NULL && Current->status != -2 && Current->status != 7 &&Current->status != 2){
+        readyListEntry(Current);
+    }
+    procPtr nextProcess;
+    if(ReadyList->nextInReadyList != NULL){
+         nextProcess = ReadyList->nextInReadyList;  //the readylist'
+        readyListRemove(nextProcess);
+    } else {
+        nextProcess = ReadyList;
+    }
     if(Current == NULL){
         p1_switch(-1, nextProcess->pid);
+        EnableInterrupts();
+        Current = nextProcess;
+        USLOSS_ContextSwitch(NULL, &(nextProcess->state));
     } else {
         p1_switch(Current->pid, nextProcess->pid);
+        EnableInterrupts();
+        procPtr tmp = Current;
+        Current = nextProcess;
+        USLOSS_ContextSwitch(&(tmp->state), &(nextProcess->state));
     }
+    
+    
+    
+    
 } /* dispatcher */
 
 /* ------------------------------------------------------------------------
@@ -618,7 +657,7 @@ void dispatcher(void) {
  ----------------------------------------------------------------------- */
 int sentinel(char *dummy) {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag) {
+		if (DEBUG && debugflag) {
 			printf("You are not in kernal mode");
 		}
 		USLOSS_Halt(1);
@@ -626,7 +665,7 @@ int sentinel(char *dummy) {
 		EnableInterrupts();
 	}
 
-	if (other_debug_flag && debugflag)
+	if (DEBUG && debugflag)
 		USLOSS_Console("sentinel(): called\n");
 	while (1) {
 		checkDeadlock();
@@ -637,7 +676,7 @@ int sentinel(char *dummy) {
 /* check to determine if deadlock has occurred... */
 static void checkDeadlock() {
 	if (currentMode() != 1) {
-		if (other_debug_flag && debugflag)
+		if (DEBUG && debugflag)
 			printf("You are not in kernal mode");
 		USLOSS_Halt(1);
 	} else {
