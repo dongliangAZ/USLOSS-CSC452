@@ -153,6 +153,54 @@ void readyListRemove(procPtr entry) {
 	}
 }
 
+/*
+ *Return values for zap(pid):
+ *-1:   the calling process itself was zapped while in zap.
+ *0:    the zapped process has called quit.
+ */
+int zap(int pid){
+
+   /*Cases that will print out errors*/
+   if(Current->pid == pid)
+   {
+    USLOSS_Console("Error:In zap(), the process %d tried to zap itself.\n", Current->pid);
+    USLOSS_Halt(1);
+   }
+   if(ProcTable[pid % 50].status == -1) {
+    USLOSS_Console("Error:In zap(), the process %d attempts to zap a nonexistent process.\n", Current->pid);
+    USLOSS_Halt(1);
+   }
+
+
+   procPtr zapped = &ProcTable[pid % 50];
+   int i =0;
+   while(zapped->zapList[i]!=NULL)
+	i++;
+
+   zapped->zapList[i]=Current;
+   zapped->zapped=1;
+
+   Current->status=BLOCKED;//Or blocked by zap.
+   //Since blocked,we call dispatcher
+   dispatcher();
+
+
+/*
+ *Return values:
+ *0:    the calling process has not been zapped.
+ *1:    the calling process has been zapped.
+ *	notes from phase1-v1.0
+ */
+   if(Current->zapped)
+   return -1;
+   else
+   return 0;
+}
+
+
+
+
+
 /*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
 
 /* ------------------------------------------------------------------------
