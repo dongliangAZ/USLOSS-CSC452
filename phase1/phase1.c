@@ -248,15 +248,15 @@ void startup(int argc, char *argv[]) {
 
 	}
 	/////////////////////
+	USLOSS_IntVec[USLOSS_CLOCK_DEV] = clockHandler;
 
 	// Initialize the Ready list, etc.
 	if (DEBUG && debugflag)
 		USLOSS_Console("startup(): initializing the Ready list\n");
 	ReadyList = NULL;
 
-	// Initialize the clock interrupt handler
-	// USLOSS_IntVec[USLOSS_ILLEGAL_INT] = interruptCase;
-	// USLOSS_IntVec[USLOSS_ALARM_INT] = interruptCase;
+	// 
+	// USLOSS_IntVec[USLOSS_ALARM_INT] = ;
 	EnableInterrupts();
 
 	// startup a sentinel process
