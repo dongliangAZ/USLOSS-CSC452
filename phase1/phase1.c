@@ -20,7 +20,7 @@ int sentinel(char *);
 void dispatcher(void);
 void launch();
 static void checkDeadlock();
-
+static void clockHandler(int, void *); 
 /* -------------------------- Globals ------------------------------------- */
 
 // Patrick's debugging global variable...
