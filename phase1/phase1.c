@@ -24,7 +24,7 @@ static void checkDeadlock();
 /* -------------------------- Globals ------------------------------------- */
 
 // Patrick's debugging global variable...
-int debugflag = 1;
+int debugflag = 0;
 // the process table
 procStruct ProcTable[MAXPROC];
 
@@ -64,7 +64,6 @@ int currentMode() {
 // else
 // return USLOSS_DEV_INVALID;
 // }
-
 void DisableInterrupts() {
 	if ((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0) {
 		USLOSS_Console("Error:Not in the kernel mode.");
@@ -110,7 +109,7 @@ void freePtr(procPtr p) {
 	p->cpuTime = -1;
 	p->children = 0;
 	p->quitVal = -1;
-  p->time = -1;
+	p->time = -1;
 	for (int i = 0; i < MAXPROC; i++)
 		p->zapList[i] = NULL;
 
@@ -124,33 +123,37 @@ void readyListEntry(procPtr entry) {
 		ReadyList = entry;
 	} else {
 		procPtr next = ReadyList;
-		while (next->nextInReadyList != NULL && next->nextInReadyList->priority > entry->priority){
-            next = next->nextInReadyList;
-        }
-        if (next->nextInReadyList != NULL) {
-				next->nextInReadyList = entry;
+		while (next->nextInReadyList != NULL
+				&& next->nextInReadyList->priority > entry->priority) {
+			next = next->nextInReadyList;
+		}
+		if (next->nextInReadyList != NULL) {
+			next->nextInReadyList = entry;
 		} else {
 			procPtr tmp = next->nextInReadyList;
 			next->nextInReadyList = entry;
 			next->nextInReadyList->nextInReadyList = tmp;
-        }
+		}
 	}
 
 }
 void readyListRemove(procPtr entry) {
 	//ReadyList will have initial blank head ptr->
 	procPtr next = ReadyList;
-    entry->status = 7; //setting it to current
+	entry->status = 7; //setting it to current
 	while (next->nextInReadyList != NULL && next->nextInReadyList != entry) {
-		if (next->nextInReadyList != NULL) {
-			exit(-1);
+		next = next->nextInReadyList;
+	}
+	if (next->nextInReadyList == NULL) {
+		if (next->pid == entry->pid) {
+			next = NULL;
 		} else {
-			if (next->nextInReadyList->nextInReadyList != NULL) {
-				next->nextInReadyList = next->nextInReadyList->nextInReadyList;
-			} else {
-				next->nextInReadyList = NULL;
+			if (DEBUG && debugflag) {
+				USLOSS_Console("Its not on the readylist\n");
 			}
 		}
+	} else {
+		next->nextInReadyList = next->nextInReadyList->nextInReadyList;
 	}
 }
 
@@ -159,48 +162,44 @@ void readyListRemove(procPtr entry) {
  *-1:   the calling process itself was zapped while in zap.
  *0:    the zapped process has called quit.
  */
-int zap(int pid){
+int zap(int pid) {
 
-   /*Cases that will print out errors*/
-   if(Current->pid == pid)
-   {
-    USLOSS_Console("Error:In zap(), the process %d tried to zap itself.\n", Current->pid);
-    USLOSS_Halt(1);
-   }
-   if(ProcTable[pid % 50].status == -1) {
-    USLOSS_Console("Error:In zap(), the process %d attempts to zap a nonexistent process.\n", Current->pid);
-    USLOSS_Halt(1);
-   }
+	/*Cases that will print out errors*/
+	if (Current->pid == pid) {
+		USLOSS_Console("Error:In zap(), the process %d tried to zap itself.\n",
+				Current->pid);
+		USLOSS_Halt(1);
+	}
+	if (ProcTable[pid % 50].status == -1) {
+		USLOSS_Console(
+				"Error:In zap(), the process %d attempts to zap a nonexistent process.\n",
+				Current->pid);
+		USLOSS_Halt(1);
+	}
 
+	procPtr zapped = &ProcTable[pid % 50];
+	int i = 0;
+	while (zapped->zapList[i] != NULL)
+		i++;
 
-   procPtr zapped = &ProcTable[pid % 50];
-   int i =0;
-   while(zapped->zapList[i]!=NULL)
-	i++;
+	zapped->zapList[i] = Current;
+	zapped->zapped = 1;
 
-   zapped->zapList[i]=Current;
-   zapped->zapped=1;
+	Current->status = 3; //Or blocked by zap.
+	//Since blocked,we call dispatcher
+	dispatcher();
 
-   Current->status=3;//Or blocked by zap.
-   //Since blocked,we call dispatcher
-   dispatcher();
-
-
-/*
- *Return values:
- *0:    the calling process has not been zapped.
- *1:    the calling process has been zapped.
- *	notes from phase1-v1.0
- */
-   if(Current->zapped)
-   return -1;
-   else
-   return 0;
+	/*
+	 *Return values:
+	 *0:    the calling process has not been zapped.
+	 *1:    the calling process has been zapped.
+	 *	notes from phase1-v1.0
+	 */
+	if (Current->zapped)
+		return -1;
+	else
+		return 0;
 }/*int zap(pid)*/
-
-
-
-
 
 /*--------------------------OUR-FUNCTIONS-END-------------------------------------*/
 
@@ -369,7 +368,7 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 	entry->children = 0;
 	entry->zapped = -1;
 	entry->zapList[0] = '\0';
-  entry->time = 0;
+	entry->time = 0;
 
 	if (strlen(name) >= (MAXNAME - 1)) {
 		USLOSS_Console("fork1(): Process name is too long.  Halting...\n");
@@ -387,34 +386,36 @@ int fork1(char *name, int (*startFunc)(char *), char *arg, int stacksize,
 
 	// Initialize context for this process, but use launch function pointer for
 	// the initial value of the process's program counter (PC)
-    if (DEBUG && debugflag){
-        USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n", ProcSpace,
-			&(ProcTable[ProcSpace].state), ProcTable[ProcSpace].stack,
-			ProcTable[ProcSpace].stackSize);
-    }
+	if (DEBUG && debugflag) {
+		USLOSS_Console("ProcSpace = %d, stack = %p, stackSize = %d\n",
+				ProcSpace, &(ProcTable[ProcSpace].state),
+				ProcTable[ProcSpace].stack, ProcTable[ProcSpace].stackSize);
+	}
 	USLOSS_ContextInit(&(ProcTable[ProcSpace].state),
 			ProcTable[ProcSpace].stack, ProcTable[ProcSpace].stackSize, NULL,
 			launch);
 
 	// for future phase(s)
 	p1_fork(ProcTable[ProcSpace].pid);
-    //adds parent to child and vice versa
-    if(Current != NULL){
-        //setting parent pid
-        ProcTable[ProcSpace].parentpid = Current->pid;
-        if(Current->childProcPtr == NULL){
-            Current->childProcPtr = &(ProcTable[ProcSpace]);
-        } else {
-            if(Current->childProcPtr->nextSiblingPtr != NULL){
-                procPtr tmp = Current->childProcPtr->nextSiblingPtr;
-                Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
-                Current->childProcPtr->nextSiblingPtr->nextSiblingPtr = tmp;
-            } else {
-                Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
-            }
-        }
-    }
-    
+	//adds parent to child and vice versa
+	if (Current != NULL) {
+		//setting parent pid
+		ProcTable[ProcSpace].parentpid = Current->pid;
+		if (Current->childProcPtr == NULL) {
+			Current->childProcPtr = &(ProcTable[ProcSpace]);
+		} else {
+			if (Current->childProcPtr->nextSiblingPtr != NULL) {
+				procPtr tmp = Current->childProcPtr->nextSiblingPtr;
+				Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
+				Current->childProcPtr->nextSiblingPtr->nextSiblingPtr = tmp;
+			} else {
+				Current->childProcPtr->nextSiblingPtr = &(ProcTable[ProcSpace]);
+			}
+		}
+	}
+	if (DEBUG && debugflag) {
+		USLOSS_Console("line 417: %s\n",ProcTable[ProcSpace].name);
+	}
 	readyListEntry(&ProcTable[ProcSpace]);
 
 	// More stuff to do here...
@@ -474,14 +475,11 @@ void launch() {
 int join(int *status) {
 	DisableInterrupts();
 	// -1 if the process was zapped in the join
-	if (isZapped())
+	if (isZapped() == -3) {
 		return -1;
-	//-2 if the process has no children
-	if (Current->childProcPtr == NULL && Current->quitChild == NULL)
+	} else if (Current->childProcPtr == NULL && Current->quitChild == NULL) { //-2 if the process has no children
 		return -2;
-
-	//Child(ren) quit() before the join() occurred.
-	if (Current->quitChild != NULL) {
+	} else if (Current->quitChild != NULL) { //Child(ren) quit() before the join() occurred.
 		procPtr temp = Current->quitChild;
 		Current->quitChild = temp->quitChild;
 
@@ -489,29 +487,28 @@ int join(int *status) {
 		int Pid = temp->pid;
 		freePtr(temp);
 		return Pid;
-	}
+	} else {
 
-	//No(unjoined) child has quit() ...  must wait.
-	Current->status = JOIN;  //Become blocked
-	dispatcher();  //Call the dispatcher
-	DisableInterrupts();
-	//Then do the process again
-	if (isZapped()){
-		return -1;
-	}
-	else if (Current->childProcPtr == NULL && Current->quitChild == NULL){
-		return -2;
-	}
-	else{
-	procPtr temp = Current->quitChild;
-	Current->quitChild = temp->quitChild;
+		//No(unjoined) child has quit() ...  must wait.
+		Current->status = JOIN;  //Become blocked
+		dispatcher();  //Call the dispatcher
+		DisableInterrupts();
+		//Then do the process again
+		if (isZapped()) {
+			return -1;
+		} else if (Current->childProcPtr == NULL && Current->quitChild == NULL) {
+			return -2;
+		} else {
+			procPtr temp = Current->quitChild;
+			Current->quitChild = temp->quitChild;
 
-	*status = temp->quitVal;
-	int Pid = temp->pid;
-	freePtr(temp);
+			*status = temp->quitVal;
+			int Pid = temp->pid;
+			freePtr(temp);
 
-	return Pid;
- }
+			return Pid;
+		}
+	}
 } /* join */
 
 /* ------------------------------------------------------------------------
@@ -523,22 +520,18 @@ int join(int *status) {
  Returns - nothing
  Side Effects - changes the parent of pid child completion status list.
  ------------------------------------------------------------------------ */
-void quit(int status) { 
- if(currentMode() != 1){
- if (DEBUG && debugflag)
- printf("You are not in kernal mode");
- USLOSS_Halt(1);
- } else {
- EnableInterrupts();
- }
- p1_quit(Current->pid);
+void quit(int status) {
+	if (currentMode() != 1) {
+		if (DEBUG && debugflag)
+			printf("You are not in kernal mode");
+		USLOSS_Halt(1);
+	} else {
+		EnableInterrupts();
+	}
 
-	procPtr temp;
-	int deadChildren = 0;
-	int hasParent = 1;
-
-	if (DEBUG && debugflag){
-		USLOSS_Console("Error:In quit(): process %d called quit()\n",Current->pid);
+	if (DEBUG && debugflag) {
+		USLOSS_Console("Error:In quit(): process %d called quit()\n",
+				Current->pid);
 	}
 	if ((USLOSS_PSR_CURRENT_MODE & USLOSS_PsrGet()) == 0) {
 		USLOSS_Console("Error:quit() is called when not in the kernel mode.");
@@ -550,50 +543,84 @@ void quit(int status) {
 		USLOSS_Console("Error: if a process with active children calls quit()");
 		USLOSS_Halt(1);
 	}
+	//readyListRemove(Current);
 	/*Set the current's status*/
 	Current->quitVal = status;
 	Current->status = -2;
-
-	p1_quit(Current->pid);
-	/*if there is any dead children*/
-	if (Current->quitChild != NULL)
-		deadChildren = 1;
-	/*if current has parrent or not*/
-
-	if (Current->parentpid == -1)
-		hasParent = 0;
-
-	if (deadChildren) {
-		while (Current->quitChild != NULL) {
-			temp = Current->quitChild;
-			freePtr(temp);
-			Current->quitChild = temp->quitChild;
-			temp->quitChild = NULL;
+	/*put on parents quit list*/
+	procPtr next;
+	if (Current->parentpid > 0) {
+		next = &(ProcTable[Current->parentpid]);
+		while (next->childProcPtr->pid != Current->pid) {
+			next = next->childProcPtr;
 		}
-
-		if (hasParent)
-		temp = &ProcTable[Current->parentpid % 50]; //The pointer point to the parent.
-		procPtr next;
-		for (next = temp; next->quitChild != NULL; next = next->quitChild)
-			;
-		next->quitChild = Current; //moce current to the end of the parent's list.
-
-		if (temp->childProcPtr->pid == Current->pid) {
-			//swap
-			procPtr t = Current->nextSiblingPtr;
-			temp->childProcPtr = t;
+		if (next->childProcPtr->childProcPtr == NULL) {
+			next->childProcPtr = NULL;
 		} else {
-			procPtr before;
-			for (before = temp->childProcPtr; before->nextSiblingPtr != NULL;
-					before = before->nextSiblingPtr)
-				if (before->nextSiblingPtr->pid == Current->pid) {
-					before->nextSiblingPtr = Current->nextSiblingPtr;
-					Current->nextSiblingPtr = NULL;
-					break;
-				}
+			next->childProcPtr = next->childProcPtr->childProcPtr;
 		}
-		temp->children--;
 	}
+	next = &(ProcTable[Current->parentpid]);
+	if (next->quitChild == NULL) {
+		next->quitChild = Current;
+	} else {
+		while (next->quitChild != NULL) {
+			next = next->quitChild;
+		}
+		next->quitChild = Current;
+	}
+
+	/*Set parent status to ready and put on readylist*/
+	ProcTable[Current->parentpid].status = 1;
+	if (DEBUG && debugflag) {
+		USLOSS_Console("line 576: %s\n", Current->name);
+	}
+    if(Current->parentpid>=0){
+        readyListEntry(&ProcTable[Current->parentpid]);
+    }
+	p1_quit(Current->pid);
+	// int deadChildren = 0;
+	// int hasParent = 1;
+	// procPtr temp;
+	// /*if there is any dead children*/
+	// if (Current->quitChild != NULL){
+	// deadChildren = 1;
+	// }
+	// /*if current has parent or not*/
+	// if (Current->parentpid == -1)
+	// hasParent = 0;
+
+	// if (deadChildren) {
+	// while (Current->quitChild != NULL) {
+	// temp = Current->quitChild;
+	// freePtr(temp);
+	// Current->quitChild = temp->quitChild;
+	// temp->quitChild = NULL;
+	// }
+
+	// if (hasParent)
+	// temp = &ProcTable[Current->parentpid % 50]; //The pointer point to the parent.
+	// procPtr next;
+	// for (next = temp; next->quitChild != NULL; next = next->quitChild)
+	// ;
+	// next->quitChild = Current; //moce current to the end of the parent's list.
+
+	// if (temp->childProcPtr->pid == Current->pid) {
+	// //swap
+	// procPtr t = Current->nextSiblingPtr;
+	// temp->childProcPtr = t;
+	// } else {
+	// procPtr before;
+	// for (before = temp->childProcPtr; before->nextSiblingPtr != NULL;
+	// before = before->nextSiblingPtr)
+	// if (before->nextSiblingPtr->pid == Current->pid) {
+	// before->nextSiblingPtr = Current->nextSiblingPtr;
+	// Current->nextSiblingPtr = NULL;
+	// break;
+	// }
+	// }
+	// temp->children--;
+	// }
 
 	dispatcher();
 } /* quit */
@@ -616,32 +643,33 @@ void dispatcher(void) {
 	} else {
 		EnableInterrupts();
 	}
-    if(Current != NULL && Current->status != -2 && Current->status != 7 &&Current->status != 2){
-        readyListEntry(Current);
-    }
-    procPtr nextProcess;
-    if(ReadyList->nextInReadyList != NULL){
-         nextProcess = ReadyList->nextInReadyList;  //the readylist'
-        readyListRemove(nextProcess);
-    } else {
-        nextProcess = ReadyList;
-    }
-    if(Current == NULL){
-        p1_switch(-1, nextProcess->pid);
-        EnableInterrupts();
-        Current = nextProcess;
-        USLOSS_ContextSwitch(NULL, &(nextProcess->state));
-    } else {
-        p1_switch(Current->pid, nextProcess->pid);
-        EnableInterrupts();
-        procPtr tmp = Current;
-        Current = nextProcess;
-        USLOSS_ContextSwitch(&(tmp->state), &(nextProcess->state));
-    }
-    
-    
-    
-    
+	if (Current != NULL && Current->status != -2 && Current->status != 7
+			&& Current->status != 2) {
+		if (DEBUG && debugflag) {
+			USLOSS_Console("line 648: %s\n",Current->name);
+		}
+		readyListEntry(Current);
+	}
+	procPtr nextProcess;
+	if (ReadyList->nextInReadyList != NULL) {
+		nextProcess = ReadyList->nextInReadyList;  //the readylist'
+		readyListRemove(nextProcess);
+	} else {
+		nextProcess = ReadyList;
+	}
+	if (Current == NULL) {
+		p1_switch(-1, nextProcess->pid);
+		EnableInterrupts();
+		Current = nextProcess;
+		USLOSS_ContextSwitch(NULL, &(nextProcess->state));
+	} else {
+		p1_switch(Current->pid, nextProcess->pid);
+		EnableInterrupts();
+		procPtr tmp = Current;
+		Current = nextProcess;
+		USLOSS_ContextSwitch(&(tmp->state), &(nextProcess->state));
+	}
+
 } /* dispatcher */
 
 /* ------------------------------------------------------------------------
@@ -669,6 +697,7 @@ int sentinel(char *dummy) {
 		USLOSS_Console("sentinel(): called\n");
 	while (1) {
 		checkDeadlock();
+        EnableInterrupts();
 		USLOSS_WaitInt();
 	}
 } /* sentinel */
@@ -682,38 +711,41 @@ static void checkDeadlock() {
 	} else {
 		EnableInterrupts();
 	}
-  int i=0;
-	int running=0;int ready=0;
+	int i = 0;
+	int running = 0;
+	int ready = 0;
 
-	for(;i<MAXPROC;i++){
-		if(ProcTable[i].status==0){
+	for (; i < MAXPROC; i++) {
+		if (ProcTable[i].status == 1) {
 			running++;
 			ready++;
-		}
-		else if(ProcTable[i].status==3||ProcTable[i].status == 2){
+		} else if (ProcTable[i].status == 3 || ProcTable[i].status == 2|| ProcTable[i].status == -2) {
 			running++;
-		}
-		else{
-
+		} else {
+           
 		}
 	}
-/*1.this is normal termination of USLOSS and ends with USLOSS_Halt(0).*/
-/*2. If checkDeadlock determines that there are process(es) other than the sentinel process
- this is abnormal termination of USLOSS and ends with USLOSS_Halt(1).*/
-/*phase1-v1.0*/
-   if(ready==1){
-		 if(running==1){
-		 		USLOSS_Halt(0);//normal
-			}
-		 else{
-				USLOSS_Console("In checkDeadlock(): abnormal termination of USLOSS and ends with USLOSS_Halt(1).");
-        USLOSS_Halt(1);
-			}
-	 }
+	/*1.this is normal termination of USLOSS and ends with USLOSS_Halt(0).*/
+	/*2. If checkDeadlock determines that there are process(es) other than the sentinel process
+	 this is abnormal termination of USLOSS and ends with USLOSS_Halt(1).*/
+	/*phase1-v1.0*/
+    if(DEBUG && debugflag){
+        USLOSS_Console("There are %d processes marked as ready.\n", ready);
+        USLOSS_Console("There are %d processes marked as running.\n", running);
+    }
+	if (ready == 1) {
+		if (running == 1) {
+			USLOSS_Halt(0);  //normal
+		} else {
+			USLOSS_Console(
+					"In checkDeadlock(): abnormal termination of USLOSS and ends with USLOSS_Halt(1).");
+			USLOSS_Halt(1);
+		}
+	}
 
-	 else{
+	else {
 
-	 }
+	}
 
 } /* checkDeadlock */
 
@@ -724,11 +756,12 @@ static void checkDeadlock() {
  *Do this at function Startup() maybe?
  */
 static void clockHandler(int dev, void *arg) {
-    if (DEBUG && debugflag)
-        USLOSS_Console("clockHandler!\n");
-    int timeDiff = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &(Current->status)) - Current->time;//Not sure this is correct.
-		if(timeDiff >= 80000 )
-				dispatcher();
-		// If the current process has exceeded its time slice then call the dispatcher().
-		//timeSlice is 80ms = 80000us.
+	if (DEBUG && debugflag)
+		USLOSS_Console("clockHandler!\n");
+	int timeDiff = USLOSS_DeviceInput(USLOSS_CLOCK_DEV, 0, &(Current->status))
+			- Current->time;  //Not sure this is correct.
+	if (timeDiff >= 80000)
+		dispatcher();
+	// If the current process has exceeded its time slice then call the dispatcher().
+	//timeSlice is 80ms = 80000us.
 }/*clockHandle*/
